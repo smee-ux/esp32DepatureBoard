@@ -14,5 +14,7 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=/home/axel/programming/esp32/oled_test_thats_for_real/build"
-  ]
+  ],
+  "idf.flashType": "UART",
+  "idf.port": "/dev/ttyACM0"
 }
