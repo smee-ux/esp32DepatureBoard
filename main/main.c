@@ -45,42 +45,9 @@ void recieve_queue(void *arg){
 	
 	while(1){
 		if (xQueueReceive(queue, (void *)&a, pdMS_TO_TICKS(100))) { // den skal have en adresse den kan skrive i
-			ssd1306_clear_screen(&device, false);
+			// ssd1306_clear_screen(&device, false);
 			ESP_LOGI("switch", "number recieved: %d", a);
-
-			switch (a) {
-				case 10:
-					ssd1306_bitmaps(&device, 0, 0, image_10, 128, 64, false);
-					break;
-				case 9:
-					ssd1306_bitmaps(&device, 0, 0, image_9, 128, 64, false);
-					break;
-				case 8:
-					ssd1306_bitmaps(&device, 0, 0, image_8, 128, 64, false);
-					break;
-				case 7:
-					ssd1306_bitmaps(&device, 0, 0, image_7, 128, 64, false);
-					break;
-				case 6:
-					ssd1306_bitmaps(&device, 0, 0, image_6, 128, 64, false);
-					break;
-				case 5:
-					ssd1306_bitmaps(&device, 0, 0, image_5, 128, 64, false);
-					break;
-				case 4:
-					ssd1306_bitmaps(&device, 0, 0, image_4, 128, 64, false);
-					break;
-				case 3:
-					ssd1306_bitmaps(&device, 0, 0, image_3, 128, 64, false);
-					break;
-				case 2:
-					ssd1306_bitmaps(&device, 0, 0, image_2, 128, 64, false);
-					break;
-				case 1:
-					ssd1306_bitmaps(&device, 0, 0, image_1, 128, 64, false);
-					break;
-			}
-		}	
+		}
 	}
 }
 
@@ -90,6 +57,7 @@ void app_main(void)
 	ssd1306_init(&device, 128, 64);
 	ssd1306_clear_screen(&device, false);
 	ssd1306_contrast(&device, 0xFF);
+	ssd1306_bitmaps(&device, 0, 0, image_2, 64, 64, false);
 
 	queue = xQueueCreate(5, sizeof(int));
 	xTaskCreate(send_queue, "send_queue", 4096, NULL, 10, NULL);
