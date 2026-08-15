@@ -88,7 +88,7 @@ void init_wifi(){
 	for(int i = 0; i < length; i++){
 		ESP_LOGI("scan", "ap %d, %s", i, wifArr[i].ssid);
 	}
-	
+
 	err = esp_wifi_connect();
 	ESP_LOGI("wifi connect", "%s", esp_err_to_name(err));
 	
@@ -100,6 +100,7 @@ void app_main(void)
 {
 
 	init_wifi();
+	// test
 	// spi_master_init(&device, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO);
 	// ssd1306_init(&device, 128, 64);
 	// ssd1306_clear_screen(&device, false);
