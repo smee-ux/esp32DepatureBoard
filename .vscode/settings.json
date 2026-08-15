@@ -13,7 +13,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=/home/axel/programming/esp32/oled_test_thats_for_real/build"
+    "--compile-commands-dir=/home/axel/programming/esp32/esp32DepartureBoard/build"
   ],
   "idf.flashType": "UART",
   "idf.port": "/dev/ttyACM0"
