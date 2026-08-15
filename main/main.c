@@ -100,7 +100,7 @@ void app_main(void)
 {
 
 	init_wifi();
-	// test
+	//
 	// spi_master_init(&device, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO);
 	// ssd1306_init(&device, 128, 64);
 	// ssd1306_clear_screen(&device, false);
