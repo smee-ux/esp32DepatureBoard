@@ -1,11 +1,7 @@
-#include <math.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "driver/gpio.h"
 #include "esp_err.h"
-#include "esp_system.h"
 #include "esp_wifi_types_generic.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
@@ -14,22 +10,16 @@
 #include "esp_log.h"
 
 //gpio and oled screen stuff
-#include "hal/gpio_types.h"
-#include "soc/gpio_num.h"
 #include "ssd1306.h"
-#include "font8x8_basic.h"
 #include "bitmaps/train_bitmap.c"
 
 #include "esp_wifi.h"
 #include "nvs_flash.h"
-#include "esp_task_wdt.h"
 
 //event groups
 #include "freertos/event_groups.h"
 
 
-//http stuff
-#include "esp_http_client.h"
 
 
 //wifi stuff
@@ -38,33 +28,16 @@
 
 #define tag "SSD1306"
 
-static QueueHandle_t queue;
+static QueueHandle_t screenManagerQueue;
+
 static SSD1306_t device;
 
-void send_queue(void *arg){
-	while(1){
-		for (int num = 10; num > 0; num--) {
-			xQueueSend(queue, (void *)&num, pdMS_TO_TICKS(0));
-			vTaskDelay(pdMS_TO_TICKS(1000));
-		}
-	}
-}
 
-void recieve_queue(void *arg){
-	int a;
-	char* line = "C ";
-	
-	while(1){
-		if (xQueueReceive(queue, (void *)&a, pdMS_TO_TICKS(100)) == pdTRUE) { // den skal have en adresse den kan skrive i
-			ESP_LOGI("switch", "number recieved: %d", a);
-			
-			// convert recieved number to a string that can be passed to ssd1306
-			char departure_string[10];
-			snprintf(departure_string, 10, "%s:%d min", line,a);			
-			ssd1306_display_text_box1(&device, 3, 48, departure_string, 10, 10, false, 0);
-		}	
-	}
-}
+struct ScreenCommand {
+	char command;
+	char message[64];
+} ScreenCommand;
+
 
 void init_wifi(void *args){
 	nvs_flash_init(); // this is neeed to init wifi
@@ -77,6 +50,7 @@ void init_wifi(void *args){
 	};
 
 	esp_err_t err;
+	struct ScreenCommand err_message_to_screen;
 	err = esp_wifi_init(&cola);
 	// ESP_LOGI("wifi init", "%s", esp_err_to_name(err));
 
@@ -84,7 +58,18 @@ void init_wifi(void *args){
 	// ESP_LOGI("wifi start", "%s", esp_err_to_name(err));
 
 	err = esp_wifi_set_mode(WIFI_MODE_STA);
-	// ESP_LOGI("wifi set mode", "%s", esp_err_to_name(err));
+	if (err == ESP_OK) {
+		err_message_to_screen.command = 'p';
+		strcpy(err_message_to_screen.message, "w-mode: ok");
+	}
+	else {
+		err_message_to_screen.command = 'p';
+		strcpy(err_message_to_screen.message, "w-mode: bad");
+		xQueueSend(screenManagerQueue, &err_message_to_screen, 0);
+		vTaskDelay(pdMS_TO_TICKS(1000));
+		strcpy(err_message_to_screen.message, esp_err_to_name(err));
+	}
+	xQueueSend(screenManagerQueue, &err_message_to_screen, 0);
 
 	err = esp_wifi_set_config(WIFI_IF_STA, &st_config);
 	// ESP_LOGI("wifi config", "%s", esp_err_to_name(err));
@@ -102,16 +87,34 @@ void init_wifi(void *args){
 }
 
 
+void screen_manager(void *args){
+	// Initialize
+	spi_master_init(&device, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO);
+	ssd1306_init(&device, 128, 64);
+	ssd1306_clear_screen(&device, false);
+	ssd1306_contrast(&device, 0xFF);
+
+	screenManagerQueue = xQueueCreate(10, sizeof(ScreenCommand));
+	struct ScreenCommand recived_message;
+
+	while (1) {
+		if (xQueueReceive(screenManagerQueue, &recived_message, 0) == pdTRUE){
+			switch (recived_message.command) { // screen manager command palette
+				case 'p': // print command
+					ssd1306_clear_screen(&device, false);
+					ssd1306_display_text(&device, 3, recived_message.message, strlen(recived_message.message), false);
+			}
+		}
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
+}
+
 void app_main(void)
 {
-	
+	xTaskCreate(screen_manager, "init_wifi", 4096, NULL, 10, NULL);
 	xTaskCreate(init_wifi, "init_wifi", 4096, NULL, 10, NULL);
 	// send_http_request();
 	// test
-	// spi_master_init(&device, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO);
-	// ssd1306_init(&device, 128, 64);
-	// ssd1306_clear_screen(&device, false);
-	// ssd1306_contrast(&device, 0xFF);
 	// ssd1306_bitmaps(&device, 0, 0, image_1, 128, 64, false);
 
 	// queue = xQueueCreate(5, sizeof(int));
