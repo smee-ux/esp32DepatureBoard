@@ -5,6 +5,7 @@
 #include <string.h>
 #include "driver/gpio.h"
 #include "esp_err.h"
+#include "esp_system.h"
 #include "esp_wifi_types_generic.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/projdefs.h"
@@ -21,6 +22,15 @@
 
 #include "esp_wifi.h"
 #include "nvs_flash.h"
+#include "esp_task_wdt.h"
+
+//event groups
+#include "freertos/event_groups.h"
+
+
+//http stuff
+#include "esp_http_client.h"
+
 
 //wifi stuff
 #define ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
@@ -30,7 +40,6 @@
 
 static QueueHandle_t queue;
 static SSD1306_t device;
-
 
 void send_queue(void *arg){
 	while(1){
@@ -46,7 +55,7 @@ void recieve_queue(void *arg){
 	char* line = "C ";
 	
 	while(1){
-		if (xQueueReceive(queue, (void *)&a, pdMS_TO_TICKS(100))) { // den skal have en adresse den kan skrive i
+		if (xQueueReceive(queue, (void *)&a, pdMS_TO_TICKS(100)) == pdTRUE) { // den skal have en adresse den kan skrive i
 			ESP_LOGI("switch", "number recieved: %d", a);
 			
 			// convert recieved number to a string that can be passed to ssd1306
@@ -57,9 +66,9 @@ void recieve_queue(void *arg){
 	}
 }
 
-void init_wifi(){
+void init_wifi(void *args){
 	nvs_flash_init(); // this is neeed to init wifi
-	wifi_init_config_t this = WIFI_INIT_CONFIG_DEFAULT();
+	wifi_init_config_t cola = WIFI_INIT_CONFIG_DEFAULT();
 	wifi_config_t st_config = {
 		.sta = {
 			.ssid = ESP_WIFI_SSID,
@@ -68,38 +77,36 @@ void init_wifi(){
 	};
 
 	esp_err_t err;
+	err = esp_wifi_init(&cola);
+	// ESP_LOGI("wifi init", "%s", esp_err_to_name(err));
 
-	err = esp_wifi_init(&this);
-	ESP_LOGI("wifi init", "%s", esp_err_to_name(err));
-
-	err = esp_wifi_start();
-	ESP_LOGI("wifi start", "%s", esp_err_to_name(err));
+	ESP_ERROR_CHECK(esp_wifi_start());
+	// ESP_LOGI("wifi start", "%s", esp_err_to_name(err));
 
 	err = esp_wifi_set_mode(WIFI_MODE_STA);
-	ESP_LOGI("wifi set mode", "%s", esp_err_to_name(err));
+	// ESP_LOGI("wifi set mode", "%s", esp_err_to_name(err));
 
 	err = esp_wifi_set_config(WIFI_IF_STA, &st_config);
-	ESP_LOGI("wifi connect", "%s", esp_err_to_name(err));
-
-	esp_wifi_scan_start(NULL, true);
-	wifi_ap_record_t wifArr[13];
-	uint16_t length = 12;
-	esp_wifi_scan_get_ap_records(&length, wifArr);
-	for(int i = 0; i < length; i++){
-		ESP_LOGI("scan", "ap %d, %s", i, wifArr[i].ssid);
-	}
+	// ESP_LOGI("wifi config", "%s", esp_err_to_name(err));
 
 	err = esp_wifi_connect();
-	ESP_LOGI("wifi connect", "%s", esp_err_to_name(err));
-	
-	
+	vTaskDelay(pdMS_TO_TICKS(4000));
+	// ESP_LOGI("wifi connect", "%s", esp_err_to_name(err));
 
+	wifi_ap_record_t ap_record;
+	esp_wifi_sta_get_ap_info(&ap_record);
+
+	ESP_LOGI("rap_record", "%s", ap_record.ssid);
+
+	vTaskDelete(NULL);
 }
+
 
 void app_main(void)
 {
-
-	init_wifi();
+	
+	xTaskCreate(init_wifi, "init_wifi", 4096, NULL, 10, NULL);
+	// send_http_request();
 	// test
 	// spi_master_init(&device, CONFIG_MOSI_GPIO, CONFIG_SCLK_GPIO, CONFIG_CS_GPIO, CONFIG_DC_GPIO, CONFIG_RESET_GPIO);
 	// ssd1306_init(&device, 128, 64);
