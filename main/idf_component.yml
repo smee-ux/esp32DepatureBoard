@@ -18,4 +18,4 @@ dependencies:
     git: https://github.com/nopnop2002/esp-idf-ssd1306
     path: components/ssd1306
     version: 4b655f2aeafa9a86250a5b99317700699c822375
-  
+
