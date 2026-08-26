@@ -65,7 +65,6 @@ void init_wifi(void *args)
 
     err = nvs_flash_init(); // this is neeed to init wifi
     debug_to_screen_queue("nvs flash", err, s_screen_manager_queue);
-    ;
 
     wifi_init_config_t w_init_config = WIFI_INIT_CONFIG_DEFAULT();
     wifi_config_t st_config = {
