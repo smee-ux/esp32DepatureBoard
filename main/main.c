@@ -45,7 +45,7 @@ void debug_to_screen_queue(char *process_to_debug_name, esp_err_t error, QueueHa
     };
 
     if (error == ESP_OK) {
-        snprintf(err_message_to_screen.message, 64 - 1, "%s: ok", process_to_debug_name);
+        snprintf(err_message_to_screen.message, 64 - 1, "%-11s [ok]", process_to_debug_name);
         xQueueSend(queue, &err_message_to_screen, 0);
     } else {
         snprintf(err_message_to_screen.message, 64 - 1, "%s: bad", process_to_debug_name);
@@ -61,7 +61,6 @@ void debug_to_screen_queue(char *process_to_debug_name, esp_err_t error, QueueHa
 
 void init_wifi(void *args)
 {
-    ScreenCommand_t err_message_to_screen;
     esp_err_t err;
 
     err = nvs_flash_init(); // this is neeed to init wifi
