@@ -27,9 +27,7 @@
 #define ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
 #define ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 
-#define tag "SSD1306"
-
-static QueueHandle_t s_screenManagerQueue;
+static QueueHandle_t s_screen_manager_queue;
 static SSD1306_t s_device;
 
 
@@ -38,23 +36,37 @@ typedef struct {
     char message[64];
 } ScreenCommand_t;
 
+// debug to screen function
+// takes process string, err-code, and screen queue handle, generates screencommand for the commands and sends it to screen queue to be printet
+void debug_to_screen_queue(char *process_to_debug_name, esp_err_t error, QueueHandle_t queue)
+{
+    ScreenCommand_t err_message_to_screen = {
+        .command = 'p',
+    };
+
+    if (error == ESP_OK) {
+        snprintf(err_message_to_screen.message, 64 - 1, "%s: ok", process_to_debug_name);
+        xQueueSend(queue, &err_message_to_screen, 0);
+    } else {
+        snprintf(err_message_to_screen.message, 64 - 1, "%s: bad", process_to_debug_name);
+        xQueueSend(queue, &err_message_to_screen, 0);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        strcpy(err_message_to_screen.message, esp_err_to_name(error));
+        xQueueSend(queue, &err_message_to_screen, 0);
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        esp_restart();
+    }
+}
+
 
 void init_wifi(void *args)
 {
-    esp_err_t err;
     ScreenCommand_t err_message_to_screen;
+    esp_err_t err;
 
     err = nvs_flash_init(); // this is neeed to init wifi
-    if (err == ESP_OK) {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "nvs_flash: ok");
-    } else {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "nvs_flash: bad");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        strcpy(err_message_to_screen.message, esp_err_to_name(err));
-    }
-    xQueueSend(s_screenManagerQueue, &err_message_to_screen, 0);
+    debug_to_screen_queue("nvs flash", err, s_screen_manager_queue);
+    ;
 
     wifi_init_config_t w_init_config = WIFI_INIT_CONFIG_DEFAULT();
     wifi_config_t st_config = {
@@ -65,55 +77,20 @@ void init_wifi(void *args)
     };
 
     err = esp_wifi_init(&w_init_config);
+    debug_to_screen_queue("w-init", err, s_screen_manager_queue);
 
-
-    ESP_ERROR_CHECK(esp_wifi_start());
-    if (err == ESP_OK) {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-start: ok");
-    } else {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-start: bad");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        strcpy(err_message_to_screen.message, esp_err_to_name(err));
-    }
+    esp_wifi_start();
+    debug_to_screen_queue("w-start", err, s_screen_manager_queue);
 
     err = esp_wifi_set_mode(WIFI_MODE_STA);
-    if (err == ESP_OK) {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-mode: ok");
-    } else {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-mode: bad");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        strcpy(err_message_to_screen.message, esp_err_to_name(err));
-    }
-    xQueueSend(s_screenManagerQueue, &err_message_to_screen, 0);
+    debug_to_screen_queue("w-mode", err, s_screen_manager_queue);
 
     err = esp_wifi_set_config(WIFI_IF_STA, &st_config);
-    if (err == ESP_OK) {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-conf: ok");
-    } else {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-conf: bad");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        strcpy(err_message_to_screen.message, esp_err_to_name(err));
-    }
-    xQueueSend(s_screenManagerQueue, &err_message_to_screen, 0);
+    debug_to_screen_queue("w-conf", err, s_screen_manager_queue);
 
     err = esp_wifi_connect();
     vTaskDelay(pdMS_TO_TICKS(4000));
-    if (err == ESP_OK) {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-conn: ok");
-    } else {
-        err_message_to_screen.command = 'p';
-        strcpy(err_message_to_screen.message, "w-conn: bad");
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        strcpy(err_message_to_screen.message, esp_err_to_name(err));
-    }
-    xQueueSend(s_screenManagerQueue, &err_message_to_screen, 0);
+    debug_to_screen_queue("w-conn", err, s_screen_manager_queue);
 
     wifi_ap_record_t ap_record;
     esp_wifi_sta_get_ap_info(&ap_record);
@@ -121,7 +98,7 @@ void init_wifi(void *args)
         .command = 'p'
     };
     strcpy(wifi_name_command.message, (char *) ap_record.ssid);
-    xQueueSend(s_screenManagerQueue, &wifi_name_command, 0);
+    xQueueSend(s_screen_manager_queue, &wifi_name_command, 0);
     vTaskDelete(NULL);
 }
 
@@ -136,20 +113,23 @@ void screen_manager(void *args)
 
 
     ScreenCommand_t recived_message;
-    int page_counter = 1;
+    int page_counter = 0;
 
     while (1) {
-        if (xQueueReceive(s_screenManagerQueue, &recived_message, 0) == pdTRUE) {
+        if (xQueueReceive(s_screen_manager_queue, &recived_message, 0) == pdTRUE) {
             switch (recived_message.command) { // screen manager command palette
-            case 'p': // print terminal style
+            case 'p': // print terminal style (mostly for debug)
                 if (page_counter > 8) {
                     page_counter = 0;
                     ssd1306_clear_screen(&s_device, false);
                 }
-                ssd1306_display_text(&s_device, page_counter, recived_message.message, strlen(recived_message.message), false);
+                if (strlen(recived_message.message) <= 16) {
+                    ssd1306_display_text(&s_device, page_counter, recived_message.message, strlen(recived_message.message), false);
+                } else {
+                    ssd1306_display_text_box1(&s_device, page_counter, 0, recived_message.message, 16, strlen(recived_message.message), false, 50);
+                }
                 page_counter++;
                 break;
-
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -158,12 +138,10 @@ void screen_manager(void *args)
 
 void app_main(void)
 {
-    s_screenManagerQueue = xQueueCreate(10, sizeof(ScreenCommand_t));
+    s_screen_manager_queue = xQueueCreate(10, sizeof(ScreenCommand_t));
     xTaskCreate(screen_manager, "init_wifi", 4096, NULL, 11, NULL);
     xTaskCreate(init_wifi, "init_wifi", 4096, NULL, 10, NULL);
-    // send_http_request();
-    // test
+
     // ssd1306_bitmaps(&device, 0, 0, image_1, 128, 64, false);
 
-    // queue = xQueueCreate(5, sizeof(int));
 }
