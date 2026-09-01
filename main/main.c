@@ -131,11 +131,10 @@ void init_wifi()
 
     esp_err_t err;
 
-    esp_netif_create_default_wifi_sta(); // abstraction layer between drivers and tcp/ip stack,  allows for some nice event handling
-
     err = esp_netif_init(); // skal kaldes for at start tcp ip stackd
     print_debug_to_screen_queue("netif", err, s_screen_manager_queue);
     
+    esp_netif_create_default_wifi_sta(); // abstraction layer between drivers and tcp/ip stack,  allows for some nice event handling
   
     wifi_init_config_t w_init_config = WIFI_INIT_CONFIG_DEFAULT();
     err = esp_wifi_init(&w_init_config);
@@ -309,8 +308,8 @@ static void http_get(void){
 
 void app_main(void)
 {
-    xTaskCreate(screen_manager, "init_wifi", 4096, NULL, 11, NULL);
     s_screen_manager_queue = xQueueCreate(10, sizeof(ScreenCommand_t));
+    xTaskCreate(screen_manager, "init_wifi", 4096, NULL, 11, NULL);
     esp_event_loop_create_default();
       // initializing nvs
     esp_err_t err = nvs_flash_init();
